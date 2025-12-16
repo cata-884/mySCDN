@@ -14,5 +14,6 @@ Am construit acest proiect pentru a demonstra concepte de **System Design** pe s
 ```bash
 ./run_script.sh 127.0.0.1
 
+```
 ### Requirements
-Adaugarea unor fisiere mp3 in 'targetFiles'. Daca utilizatorul are cont de spotify, poate folosi 'spotDL'(https://github.com/spotDL/spotify-downloader).
+Adaugarea unor fisiere mp3 in 'targetFiles' este total necesara. Daca nr de melodii este prea mic . Daca utilizatorul are cont de spotify, poate folosi 'spotDL'(https://github.com/spotDL/spotify-downloader).
