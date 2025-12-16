@@ -1,0 +1,3 @@
+/home/cata-884/Backup_Server/restored_project/build/CMakeFiles/myscdn_node.dir
+/home/cata-884/Backup_Server/restored_project/build/CMakeFiles/edit_cache.dir
+/home/cata-884/Backup_Server/restored_project/build/CMakeFiles/rebuild_cache.dir
