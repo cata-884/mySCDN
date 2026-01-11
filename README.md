@@ -1,6 +1,7 @@
 # mySCDN
 
 O implementare lightweight de CDN distribuit, scrisă de la zero în C++11 (fără biblioteci externe pentru rețea). Proiectul simulează o rețea de noduri care stochează și livrează conținut multimedia (MP3), folosind consistent hashing, caching LRU și o bază de date SQLite pentru logging și catalogare.
+Readme-ul curent este invechit, dar serverul poate fi oricum rulat folosind configuratia urmatoare. Testarile prin netcat sunt functionale.
 
 ## Configurare și Rulare
 
@@ -8,19 +9,23 @@ Sistemul se bazează pe trei scripturi principale pentru configurare și execuț
 
 **1. Distribuirea Fișierelor**
 Acest script populează directoarele nodurilor cu fișiere media pentru a simula distribuția datelor. Este necesar să ai fișiere mp3 în folderul sursă înainte de rulare.
+
 ```bash
-./distributeTargetFiles.sh
+./scripts/distributeTargetFiles.sh
 ```
+
 **2. Pornirea Serverelor**
 Acest script compilează întregul proiect și lansează nodurile serverului în background. Necesită specificarea adresei IP (de obicei loopback pentru teste locale).
+
 ```bash
-./run_script.sh 127.0.0.1 2
+./scripts/run_script.sh 127.0.0.1 2
 ```
+
 Serverul are urmatoarele specificatii:
 
-=> Porturile nodurilor se incadreaza in intervalul [8000, 8000+n], in raport cu cate servere dorim sa rulam(parametrul n);
+=> Porturile nodurilor se incadreaza in intervalul [8000, 8000+n-1], in raport cu cate servere dorim sa rulam(parametrul n);
 
-=> Fisierele pentru care nodul i este responsabil sunt stocate in locatia ./targetFilesDistributed_i 
+=> Fisierele pentru care nodul i este responsabil sunt stocate in locatia ./targetFilesDistributed_i
 
 => Fiecare nod poate avea maxim 10 conexiuni;
 
@@ -34,30 +39,19 @@ Pentru a modifica acesti parametri, trebuie modificat doar run_script.sh.
 Exista doua opțiuni pentru a rula clienții:
 
 Varianta A: Automat (ruleaza n clienti la [IP] [PORT])
+
 ```bash
-./run_clients.sh 127.0.0.1 8000 1
+./scripts/run_clients.sh 127.0.0.1 8000 1
 ```
+
 Varianta B: Manual
+
 ```bash
 ./build/myscdn_client 127.0.0.1 8001
 ```
 
-## Comenzi TUI (Interfața Client)
-Aceste comenzi sunt disponibile utilizatorului în aplicația client (myscdn_client).
-
-=> auth <nume> Autentifică utilizatorul în rețea. Accesul la descărcări este permis doar utilizatorilor autentificați (ex: admin, user). Exemplu: auth admin
-
-=> catalog Cere serverului lista fișierelor disponibile în CDN. Afișează numele fișierului și nodul care îl deține conform bazei de date.
-
-=> get <fisier> Inițiază descărcarea unui fișier. Clientul gestionează automat redirectările dacă fișierul nu se află pe nodul la care ești conectat. După descărcare, fișierul este redat automat. Exemplu: get melodie.mp3
-
-=> play Redă ultimul fișier descărcat local, fără a mai iniția o conexiune de rețea.
-
-=> commands Afișează lista de comenzi disponibile.
-
-=> quit sau exit Închide aplicația client și oprește redarea audio.
-
 ## Comenzi Protocol (Debug via Netcat)
+
 Aceste comenzi pot fi trimise direct către server folosind utilitarul netcat (ex: nc 127.0.0.1 8001). Sunt utile pentru debugging sau administrare.
 
 => AUTH <nume> Trimite credențialele către server. Exemplu: AUTH admin
