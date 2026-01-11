@@ -1,0 +1,3 @@
+admin admin
+user user
+node_internal user

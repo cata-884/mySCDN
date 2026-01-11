@@ -1,0 +1,7 @@
+targetFiles/
+intrebari
+compile_commands.json
+build/
+.vscode/
+*.db
+cache/
