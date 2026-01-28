@@ -2,38 +2,32 @@
 #include "cdn/NodeConfig.hpp"
 
 loadMonitor::loadMonitor(const NodeConfig &config) noexcept
-    : conexiuniMaxime(config.maxConexiuni), clientiConectati(0) {}
+    : conexiuniMaxime(config.maxConexiuni) {}
 
 // replicam std::mutex si distrugerea automata fara a apela explicit un
 // destructor cand avem return sau throw
 loadMonitor::ticket loadMonitor::tryAquire() {
-  std::lock_guard<std::mutex> lock(m_mutex);
+  std::lock_guard lock(m_mutex);
 
   if (clientiConectati < conexiuniMaxime) {
     clientiConectati++;
     // shared_from_this() ne permite sa avem o instanta de shared pointer atunci
     // cand tot ce avem e this. vrem mereu sa tinem minte originalul
-    try {
-      return ticket(shared_from_this());
-    } catch (...) {
-      clientiConectati--;
-      throw;
-    }
-    return ticket(nullptr);
+    return ticket(shared_from_this());
   }
   // failure
   return ticket(nullptr);
 }
 
 void loadMonitor::Release() noexcept {
-  std::lock_guard<std::mutex> lock(m_mutex);
+  std::lock_guard lock(m_mutex);
   if (conexiuniMaxime > 0 && clientiConectati > 0) {
     clientiConectati--;
   }
 }
 
 std::size_t loadMonitor::ActiveConnections() const noexcept {
-  std::lock_guard<std::mutex> lock(m_mutex);
+  std::lock_guard lock(m_mutex);
   return clientiConectati;
 }
 

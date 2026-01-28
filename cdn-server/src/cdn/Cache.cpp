@@ -11,15 +11,15 @@ cacheStore::cacheStore(const NodeConfig &config)
 
 std::unique_ptr<std::string> cacheStore::Get(const std::string &key) {
   // nu pot opera 2+ threaduri in acelas timp
-  std::unique_lock<std::mutex> lock(threadSafetyMutex);
-  auto it = lookupMap.find(key);
+  std::unique_lock lock(threadSafetyMutex);
+  const auto it = lookupMap.find(key);
 
   if (it == lookupMap.end()) {
     //++stats.misses;
     return nullptr;
   }
 
-  auto now = std::chrono::system_clock::now();
+  const auto now = std::chrono::system_clock::now();
   cacheEntry &entry = it->second.second;
   // a expirat termenul fisierului din subNodes
   if (now > entry.expiryTime) {
@@ -32,7 +32,7 @@ std::unique_ptr<std::string> cacheStore::Get(const std::string &key) {
   // mutam elementul most recently used in fata
   listaLRU.splice(listaLRU.begin(), listaLRU, it->second.first);
   //++stats.hits;
-  return std::unique_ptr<std::string>(new std::string(entry.payload));
+  return std::make_unique<std::string>(entry.payload);
 }
 
 void cacheStore::Put(const std::string &key, std::string &value) {
@@ -40,12 +40,11 @@ void cacheStore::Put(const std::string &key, std::string &value) {
   if (valueSize > maxCapacityBytes) {
     return;
   }
-  std::lock_guard<std::mutex> lock(threadSafetyMutex);
-  auto now = std::chrono::system_clock::now();
-  auto expiry = now + defaultTTL;
-  auto it = lookupMap.find(key);
+  std::lock_guard lock(threadSafetyMutex);
+  const auto now = std::chrono::system_clock::now();
+  const auto expiry = now + defaultTTL;
   // daca fisierul s-a gasit, il stergem
-  if (it != lookupMap.end()) {
+  if (const auto it = lookupMap.find(key); it != lookupMap.end()) {
     currentUsageBytes -= it->second.second.sizeInBytes;
     listaLRU.splice(listaLRU.begin(), listaLRU, it->second.first);
     it->second.second = cacheEntry(std::move(value), expiry, valueSize);
@@ -61,8 +60,7 @@ void cacheStore::Put(const std::string &key, std::string &value) {
          !listaLRU.empty()) {
     // extragem ultimul element
     const auto &lruKey = listaLRU.back();
-    auto lruIT = lookupMap.find(lruKey);
-    if (lruIT != lookupMap.end()) {
+    if (auto lruIT = lookupMap.find(lruKey); lruIT != lookupMap.end()) {
       currentUsageBytes -= lruIT->second.second.sizeInBytes;
       lookupMap.erase(lruIT);
       //++stats.evictions;
@@ -76,9 +74,8 @@ void cacheStore::Put(const std::string &key, std::string &value) {
 }*/
 
 void cacheStore::Remove(const std::string &key) {
-  std::lock_guard<std::mutex> lock(threadSafetyMutex);
-  auto it = lookupMap.find(key);
-  if (it != lookupMap.end()) {
+  std::lock_guard lock(threadSafetyMutex);
+  if (const auto it = lookupMap.find(key); it != lookupMap.end()) {
     currentUsageBytes -= it->second.second.sizeInBytes;
     listaLRU.erase(it->second.first);
     lookupMap.erase(it);

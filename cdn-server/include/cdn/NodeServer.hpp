@@ -21,7 +21,7 @@ private:
   std::mutex logMutex;
 
   void log_msg(const std::string &text);
-  void rezolva_continut(const std::string &nume_resursa, TcpSocket &s,
+  void rezolva_continut(const std::string &nume_resursa, const TcpSocket &s,
                         const std::string &user_context);
 
   std::unique_ptr<std::string> iaDeLaVecin(const PeerDescriptor &vecin,
@@ -33,10 +33,10 @@ private:
 public:
   explicit NodeServer(NodeConfig c);
 
-  loadMonitor::ticket ia_bilet();
-  void trimiteLaAltul(TcpSocket &clientSock); // redirect
+  loadMonitor::ticket ia_bilet() const;
+  void trimiteLaAltul(const TcpSocket &clientSock); // redirect
   void StartClientLoop(TcpSocket socketul,
-                       std::shared_ptr<loadMonitor::ticket> biletPtr = nullptr);
+                       const std::shared_ptr<loadMonitor::ticket>& biletPtr = nullptr);
 
   const NodeConfig &get_conf() const { return conf; }
 };

@@ -18,8 +18,8 @@ struct cacheEntry {
   std::size_t sizeInBytes;
   cacheEntry() : sizeInBytes(0) {}
 
-  cacheEntry(std::string p, std::chrono::system_clock::time_point t,
-             std::size_t s)
+  cacheEntry(std::string p, const std::chrono::system_clock::time_point t,
+             const std::size_t s)
       : payload(std::move(p)), expiryTime(t), sizeInBytes(s) {}
 };
 
@@ -41,7 +41,7 @@ private:
   // for debugging
   // mutable cacheStats stats;
 public:
-  cacheStore(const NodeConfig &config);
+  explicit cacheStore(const NodeConfig &config);
   std::unique_ptr<std::string> Get(const std::string &key);
   void Put(const std::string &key, std::string &value);
   void Remove(const std::string &key);

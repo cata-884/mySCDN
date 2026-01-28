@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <string>
 
-inline void throwIF(bool condition, const std::string &msg) {
+inline void throwIF(const bool condition, const std::string &msg) {
   if (condition) {
     throw std::runtime_error(msg + ": " + std::strerror(errno));
   }

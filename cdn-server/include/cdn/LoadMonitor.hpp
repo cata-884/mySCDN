@@ -32,7 +32,7 @@ public:
 
     ~ticket();
 
-    bool Valid() const noexcept { return monitorPtr != nullptr; }
+    [[nodiscard]] bool Valid() const noexcept { return monitorPtr != nullptr; }
   };
 
   explicit loadMonitor(const NodeConfig &config) noexcept;

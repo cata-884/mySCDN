@@ -5,24 +5,24 @@
 #include <vector>
 
 std::pair<std::string, std::uint16_t> processIP_Port(const std::string &input) {
-  auto it = input.find(':');
+  const auto it = input.find(':');
   throwIF(it == std::string::npos,
           "Input-ul de forma '127.0.0.1:8080' nu poate fi procesat, lipseste "
           "caracterului ':'");
   std::string ipAdress = input.substr(0, it);
-  std::string port = input.substr(it + 1);
+  const std::string port = input.substr(it + 1);
   return std::make_pair(ipAdress, static_cast<std::uint16_t>(std::stoi(port)));
 }
 
 PeerDescriptor processPeer(const std::string &input) {
-  auto it = input.find('@');
+  const auto it = input.find('@');
   throwIF(it == std::string::npos,
           "Input-ul de de forma 'node1@127.0.0.1:8080' nu poate fi procesat, "
           "lipseste caracterul '@'");
   std::string node = input.substr(0, it);
-  std::string IP_Port = input.substr(it + 1);
-  std::pair<std::string, std::uint16_t> ipInfo = processIP_Port(IP_Port);
-  return PeerDescriptor(node, ipInfo.first, ipInfo.second);
+  const std::string IP_Port = input.substr(it + 1);
+  const auto [fst, snd] = processIP_Port(IP_Port);
+  return {node, fst, snd};
 }
 
 const PeerDescriptor *NodeConfig::findNode(const std::string &id) const {
@@ -36,9 +36,8 @@ const PeerDescriptor *NodeConfig::findNode(const std::string &id) const {
 
 const PeerDescriptor &NodeConfig::self() const {
   const PeerDescriptor *ptr = findNode(nodeId);
-  throwIF(!ptr, ("Nodul curent (" + nodeId +
-                 ") nu a fost gasit in lista de cluster-nodes!")
-                    .c_str());
+  throwIF(!ptr, "Nodul curent (" + nodeId +
+                 ") nu a fost gasit in lista de cluster-nodes!");
   return *ptr;
 }
 /*
@@ -54,7 +53,7 @@ init cluster 2 noduri
     --db-path ../CDN.db \
     --auth-file ../auth.txt
 */
-NodeConfig ParseArguments(int argc, char *argv[]) {
+NodeConfig ParseArguments(const int argc, char *argv[]) {
   NodeConfig config;
   bool idSet = false;
   bool listenSet = false;
@@ -65,17 +64,16 @@ NodeConfig ParseArguments(int argc, char *argv[]) {
   bool dbSet = false;
 
   for (int i = 1; i < argc; ++i) {
-    std::string arg = argv[i];
     // numele noului nod declarat
-    if (arg == "--node-id" && i + 1 < argc) {
+    if (std::string arg = argv[i]; arg == "--node-id" && i + 1 < argc) {
       config.nodeId = argv[++i];
       idSet = true;
     }
     // detalii pentru a rula serverul si a asculta comenzi
     else if (arg == "--listen" && i + 1 < argc) {
-      std::pair<std::string, std::uint16_t> ipInfo = processIP_Port(argv[++i]);
-      config.ipAddress = ipInfo.first;
-      config.port = ipInfo.second;
+      const auto [fst, snd] = processIP_Port(argv[++i]);
+      config.ipAddress = fst;
+      config.port = snd;
       listenSet = true;
     }
     // detaliile subnodurilor colege
@@ -84,11 +82,11 @@ NodeConfig ParseArguments(int argc, char *argv[]) {
       // clusterSet = true;
     }
     // de unde preluam datele
-    else if ((arg == "--target-files") && i + 1 < argc) {
+    else if (arg == "--target-files" && i + 1 < argc) {
       config.targetFilesLocation = argv[++i];
       targetSet = true;
     }
-    // in rest e self explanatory
+    // in rest e self-explanatory
     else if (arg == "--max-connections" && i + 1 < argc) {
       config.maxConexiuni = std::stoul(argv[++i]);
       maxConnSet = true;
@@ -133,8 +131,7 @@ NodeConfig ParseArguments(int argc, char *argv[]) {
   }
 
   if (!selfFound) {
-    config.peersVector.push_back(
-        PeerDescriptor(config.nodeId, config.ipAddress, config.port));
+    config.peersVector.emplace_back(config.nodeId, config.ipAddress, config.port);
   }
 
   return config;

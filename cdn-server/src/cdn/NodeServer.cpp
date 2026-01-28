@@ -10,10 +10,9 @@
 #include <mutex>
 #include <sstream>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <vector>
 
-static const std::size_t limita_superioara = 50 * 1024 * 1024;
+static constexpr std::size_t limita_superioara = 50 * 1024 * 1024;
 
 // access_logs = {id, node_id, file_name, client_ip, timestamp}
 
@@ -48,12 +47,10 @@ NodeServer::NodeServer(NodeConfig c)
   log_msg("M-am adaugat in inelul de hash.");
 
   int cnt = 0;
-  DIR *d;
-  struct dirent *e;
-  if ((d = opendir(conf.targetFilesLocation.c_str())) != NULL) {
-    while ((e = readdir(d)) != NULL) {
-      std::string nume_f = e->d_name;
-      if (nume_f != "." && nume_f != "..") {
+  dirent *e;
+  if (DIR *d; (d = opendir(conf.targetFilesLocation.c_str())) != nullptr) {
+    while ((e = readdir(d)) != nullptr) {
+      if (std::string nume_f = e->d_name; nume_f != "." && nume_f != "..") {
         db_manager.RegisterFile(conf.nodeId, nume_f);
         cnt++;
       }
@@ -99,8 +96,8 @@ NodeServer::citesteDisk(const std::string &fisier) {
   log_msg("[HDD] Fisier gasit. Marime: " + std::to_string(marime) +
           " bytes. Incarc in RAM...");
   f.seekg(0, std::ios::beg);
-  auto continut = std::unique_ptr<std::string>(
-      new std::string(static_cast<size_t>(marime), 0));
+  auto continut = std::make_unique<std::string>(
+      static_cast<size_t>(marime), 0);
 
   if (f.read(&(*continut)[0], marime)) {
     log_msg("[HDD] Citire completa.");
@@ -120,8 +117,7 @@ NodeServer::iaDeLaVecin(const PeerDescriptor &vecin,
 
     s.SendAll("AUTH node_internal\n");
 
-    std::string raspunsAuth = s.recvLine();
-    if (raspunsAuth.find("ERROR") != std::string::npos) {
+    if (const std::string raspunsAuth = s.recvLine(); raspunsAuth.find("ERROR") != std::string::npos) {
       log_msg("[NET] Colegul " + vecin.ID + " a Auth-ul");
       return nullptr;
     }
@@ -129,7 +125,7 @@ NodeServer::iaDeLaVecin(const PeerDescriptor &vecin,
     log_msg("[NET] Auth OK. Trimit GET " + ceVreau);
     s.SendAll("GET /" + ceVreau + "\n");
 
-    std::string cap_tabel = s.recvLine(); // absorb header
+    const std::string cap_tabel = s.recvLine(); // absorb header
     std::istringstream stream(cap_tabel);
     std::string proto, stare;
     stream >> proto >> stare;
@@ -146,9 +142,7 @@ NodeServer::iaDeLaVecin(const PeerDescriptor &vecin,
       }
       std::string datele = s.recvN(catDeMare);
       log_msg("[NET] Transfer complet de la " + vecin.ID);
-      return std::unique_ptr<std::string>(new std::string(std::move(datele)));
-    } else {
-      log_msg("[NET] Colegul a raspuns cu eroare: " + stare);
+      return std::make_unique<std::string>(std::move(datele));
     }
   } catch (const std::exception &e) {
     log_msg("[NET] Exception cu colegul (" + vecin.ID + "): " + e.what());
@@ -157,18 +151,17 @@ NodeServer::iaDeLaVecin(const PeerDescriptor &vecin,
 }
 
 void NodeServer::log_msg(const std::string &text) {
-  std::lock_guard<std::mutex> lk(logMutex);
+  std::lock_guard lk(logMutex);
   std::cout << "[" << conf.nodeId << "] " << text << std::endl;
 }
 
-loadMonitor::ticket NodeServer::ia_bilet() { return monitorul->tryAquire(); }
+loadMonitor::ticket NodeServer::ia_bilet() const { return monitorul->tryAquire(); }
 
-void NodeServer::trimiteLaAltul(TcpSocket &clientSock) {
-  auto vecinii = inelul.Nodes();
-  for (const auto &v : vecinii) {
+void NodeServer::trimiteLaAltul(const TcpSocket &clientSock) {
+  for (const auto vecinii = inelul.Nodes(); const auto &v : vecinii) {
     if (v.ID != conf.nodeId) {
       log_msg("[LOAD] Redirect client catre " + v.ID);
-      std::string msg =
+      const std::string msg =
           "RESP REDIRECT " + v.ipAdress + " " + std::to_string(v.port) + "\n";
       try {
         clientSock.SendAll(msg);
@@ -183,20 +176,19 @@ void NodeServer::trimiteLaAltul(TcpSocket &clientSock) {
   } catch (...) {
   }
 }
-void NodeServer::rezolva_continut(const std::string &nume_resursa, TcpSocket &s,
+void NodeServer::rezolva_continut(const std::string &nume_resursa, const TcpSocket &s,
                                   const std::string &user_context) {
   std::string ipClient = s.getIP();
   if (ipClient.empty())
     ipClient = "Necunoscut";
   //"admin@127.0.0.1"
-  std::string identitate_log =
+  const std::string identitate_log =
       (user_context.empty() ? "anonim" : user_context) + "@" + ipClient;
 
   log_msg("[REQ] Client " + identitate_log + " vrea: " + nume_resursa);
   db_manager.LogAccess(conf.nodeId, nume_resursa, identitate_log);
 
-  auto dinRam = memoriaRam.Get(nume_resursa);
-  if (dinRam) {
+  if (const auto dinRam = memoriaRam.Get(nume_resursa)) {
     log_msg("[CACHE] HIT! Am gasit " + nume_resursa + " in RAM (" +
             std::to_string(dinRam->size()) + " bytes).");
     s.SendAll("RESP OK " + std::to_string(dinRam->size()) + "\n");
@@ -207,7 +199,7 @@ void NodeServer::rezolva_continut(const std::string &nume_resursa, TcpSocket &s,
 
   log_msg("[CACHE] MISS. Nu e in RAM. Intreb baza de date...");
 
-  std::string idProprietar = db_manager.get_owner_id(nume_resursa);
+  const std::string idProprietar = db_manager.get_owner_id(nume_resursa);
 
   PeerDescriptor nodTinta;
   bool eInBaza = false;
@@ -220,8 +212,7 @@ void NodeServer::rezolva_continut(const std::string &nume_resursa, TcpSocket &s,
       log_msg("[DB] Eu sunt proprietarul! Caut pe disc...");
       nodTinta = conf.self();
     } else {
-      const PeerDescriptor *p = conf.findNode(idProprietar);
-      if (p) {
+      if (const PeerDescriptor *p = conf.findNode(idProprietar)) {
         nodTinta = *p;
       } else {
         log_msg("[DB] Ciudat... DB zice " + idProprietar +
@@ -235,9 +226,8 @@ void NodeServer::rezolva_continut(const std::string &nume_resursa, TcpSocket &s,
   }
 
   std::unique_ptr<std::string> dateleMele = nullptr;
-  bool admin = (nodTinta.ID == conf.nodeId);
 
-  if (admin) {
+  if (nodTinta.ID == conf.nodeId) {
     dateleMele = citesteDisk(nume_resursa);
     if (!dateleMele) {
       log_msg("[DISK] Nu am gasit fisierul pe disc");
@@ -260,10 +250,10 @@ void NodeServer::rezolva_continut(const std::string &nume_resursa, TcpSocket &s,
   }
   // intai trimit datele, apoi le salvez in cache, din cauza move-ului
   if (dateleMele) {
-    size_t marime = dateleMele->size();
+    const size_t marime = dateleMele->size();
     log_msg("[DONE] Am datele (" + std::to_string(marime) +
             " bytes). Le trimit la client");
-    std::string header = "RESP OK " + std::to_string(marime) + "\n";
+    const std::string header = "RESP OK " + std::to_string(marime) + "\n";
     s.SendAll(header);
     s.SendAll(*dateleMele);
 
@@ -273,23 +263,20 @@ void NodeServer::rezolva_continut(const std::string &nume_resursa, TcpSocket &s,
 }
 
 void NodeServer::StartClientLoop(
-    TcpSocket socketul, std::shared_ptr<loadMonitor::ticket> biletPtr) {
+    TcpSocket socketul, const std::shared_ptr<loadMonitor::ticket>& biletPtr) {
   std::string ip = socketul.getIP();
   log_msg("[CLIENT] Conexiune noua de la " + ip);
   if (!biletPtr || !biletPtr->Valid()) {
-    auto biletNou = monitorul->tryAquire();
-    if (!biletNou.Valid()) {
+    if (auto biletNou = monitorul->tryAquire(); !biletNou.Valid()) {
       log_msg("[LOAD] Resping client " + ip + " (Supraincarcat).");
       trimiteLaAltul(socketul);
       return;
     }
-    biletPtr = std::make_shared<loadMonitor::ticket>(std::move(biletNou));
   }
 
-  bool e_logat = false;
-  std::string rolCurent = "";
-
   try {
+    std::string rolCurent;
+    bool e_logat = false;
     while (true) {
       std::string linie = socketul.recvLine();
 
@@ -308,8 +295,7 @@ void NodeServer::StartClientLoop(
       // trim()
       if (!restul.empty() && restul[0] == ' ')
         restul.erase(0, 1);
-      size_t ultimul = restul.find_last_not_of("\r\n ");
-      if (ultimul != std::string::npos) {
+      if (size_t ultimul = restul.find_last_not_of("\r\n "); ultimul != std::string::npos) {
         restul = restul.substr(0, ultimul + 1);
       } else if (!restul.empty()) {
         restul.clear();
@@ -326,9 +312,7 @@ void NodeServer::StartClientLoop(
           continue;
         }
 
-        bool creat = db_manager.CreateUser(u, p, "user");
-
-        if (creat) {
+        if (db_manager.CreateUser(u, p, "user")) {
           log_msg("[AUTH] User nou inregistrat: " + u);
           socketul.SendAll("RESP OK CREATED\n");
         } else {
@@ -338,7 +322,7 @@ void NodeServer::StartClientLoop(
         continue;
       }
 
-      else if (comanda == "AUTH") {
+      if (comanda == "AUTH") {
         std::string u, p;
         std::stringstream ss(restul);
         ss >> u >> p;
@@ -348,10 +332,8 @@ void NodeServer::StartClientLoop(
           continue;
         }
 
-        std::string rol = db_manager.CheckLogin(u, p);
-
-        if (!rol.empty()) {
-          log_msg("[AUTH] Login succes: " + u + " (" + rol + ")");
+        if (std::string rol = db_manager.CheckLogin(u, p); !rol.empty()) {
+          log_msg(rol.append("[AUTH] Login succes: " + u + " (") + ")");
           e_logat = true;
           rolCurent = rol;
           socketul.SendAll("RESP OK AUTH_ACCEPTED " + rol + "\n");
@@ -398,18 +380,18 @@ void NodeServer::StartClientLoop(
         log_msg("[ADMIN] Cineva vrea sa vada log-urile.");
         std::vector<LogEntry> entries = db_manager.getLogs();
         socketul.SendAll("RESP OK LOGS_LIST\n");
-        for (const auto &inreg : entries) {
+        for (const auto &[id, node_id, file_name, client_ip, time] : entries) {
           // conversie urata din chrono in string citibil
-          std::time_t timp_t = std::chrono::system_clock::to_time_t(inreg.time);
+          std::time_t timp_t = std::chrono::system_clock::to_time_t(time);
           char buffer_ceas[64];
           // formatare: 2026-01-03 14:30:00
           std::strftime(buffer_ceas, sizeof(buffer_ceas), "%Y-%m-%d %H:%M:%S",
                         std::localtime(&timp_t));
 
           std::stringstream ss;
-          ss << "ID:" << inreg.id << " [" << buffer_ceas << "] "
-             << "Nod:" << inreg.node_id << " " << "Fis:" << inreg.file_name
-             << " " << "IP:" << inreg.client_ip << "\n";
+          ss << "ID:" << id << " [" << buffer_ceas << "] "
+             << "Nod:" << node_id << " " << "Fis:" << file_name
+             << " " << "IP:" << client_ip << "\n";
 
           socketul.SendAll(ss.str());
         }
@@ -419,11 +401,10 @@ void NodeServer::StartClientLoop(
         int p;
         std::istringstream joinStream(restul);
         joinStream >> id >> _ip >> p;
-        log_msg("[CLUSTER] Cerere JOIN de la " + id + " (" + ip + ")");
+        log_msg(ip.append("[CLUSTER] Cerere JOIN de la " + id + " (") + ")");
 
         bool exista = false;
-        auto lista = inelul.Nodes();
-        for (auto &x : lista)
+        for (auto lista = inelul.Nodes(); auto &x : lista)
           if (x.ID == id)
             exista = true;
 
@@ -447,8 +428,8 @@ void NodeServer::StartClientLoop(
         log_msg("[CMD] Userul cere CATALOG.");
         auto c = db_manager.GetCatalog();
         std::string raspuns = "RESP OK CATALOG\n";
-        for (auto &el : c)
-          raspuns += el.first + " @ " + el.second + "\n";
+        for (auto &[fst, snd] : c)
+          raspuns += snd.append(fst + " @ ").append("\n");
         socketul.SendAll(raspuns);
         socketul.SendAll("RESP END\n");
       }
@@ -456,8 +437,8 @@ void NodeServer::StartClientLoop(
       else if (comanda == "STATS") {
         auto top = db_manager.top_files(5);
         std::string r = "RESP OK STATS\n";
-        for (auto &t : top)
-          r += t.first + " (" + std::to_string(t.second) + ")\n";
+        for (auto &[fst, snd] : top)
+          r += fst + " (" + std::to_string(snd) + ")\n";
         socketul.SendAll(r);
         socketul.SendAll("RESP END\n");
       }
@@ -484,8 +465,7 @@ void NodeServer::StartClientLoop(
           socketul.SendAll("RESP ERROR Nu esti sef (Admin only)\n");
           continue;
         }
-        std::string deSters = restul;
-        if (!deSters.empty()) {
+        if (const std::string& deSters = restul; !deSters.empty()) {
           memoriaRam.Remove(deSters);
           log_msg("[ADMIN] PURGE Cache pentru: " + deSters);
           socketul.SendAll("RESP OK PURGED " + deSters + "\n");

@@ -14,10 +14,9 @@ typedef struct {
 } LogEntry;
 
 class DatabaseManager {
-private:
   sqlite3 *conn_ptr;
   std::mutex m_mutex;
-  void create_tables_if_not_exist();
+  void create_tables_if_not_exist() const;
 
 public:
   explicit DatabaseManager(const std::string &path = "cdn.db");

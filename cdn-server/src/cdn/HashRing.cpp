@@ -11,7 +11,7 @@
 
 std::size_t HasheazaResursa(const std::string &text) {
   std::size_t sum = 0;
-  for (char c : text) {
+  for (const char c : text) {
     sum += static_cast<unsigned char>(c);
   }
   return sum;
@@ -21,26 +21,26 @@ std::size_t HasheazaResursa(const std::string &text) {
 // server A(node1) - (node1, node2, node3, ...)
 // server B(node2) - (node3, node1, node2, ...)
 hashRing::hashRing(const NodeConfig &config)
-    : serviceNodes(std::move(config.peersVector)) {
+    : serviceNodes(config.peersVector) {
   throwIF(serviceNodes.empty(), "Hashring necesita macar un nod");
   // sortam alfabetic pentru a asigura structura node1 => node2 => ...
-  std::sort(serviceNodes.begin(), serviceNodes.end(),
-            [](const PeerDescriptor &a, const PeerDescriptor &b) {
-              return a.ID < b.ID;
-            });
+  std::ranges::sort(serviceNodes,
+                    [](const PeerDescriptor &a, const PeerDescriptor &b) {
+                      return a.ID < b.ID;
+                    });
 }
 
 // folosit pentru identificarea carui nod este responsabil, DACA nodul este
 // online. daca e offline, se recalculeaza distributia
 PeerDescriptor hashRing::Locate(const std::string &resursa) const {
-  std::lock_guard<std::mutex> lock(threadMutex);
-  std::size_t valoareHash = HasheazaResursa(resursa);
-  std::size_t index = valoareHash % serviceNodes.size();
+  std::lock_guard lock(threadMutex);
+  const std::size_t valoareHash = HasheazaResursa(resursa);
+  const std::size_t index = valoareHash % serviceNodes.size();
   return serviceNodes[index];
 }
 // vecinul idNod-ului
 PeerDescriptor hashRing::NextAfter(const std::string &idNod) const {
-  std::lock_guard<std::mutex> lock(threadMutex);
+  std::lock_guard lock(threadMutex);
   if (serviceNodes.size() <= 1)
     return PeerDescriptor{};
   for (std::size_t i = 0; i < serviceNodes.size(); i++) {
@@ -52,20 +52,20 @@ PeerDescriptor hashRing::NextAfter(const std::string &idNod) const {
 }
 
 void hashRing::AddNode(const PeerDescriptor &node) {
-  std::lock_guard<std::mutex> lock(threadMutex);
+  std::lock_guard lock(threadMutex);
   for (const auto &n : serviceNodes) {
     if (n.ID == node.ID)
       return;
   }
   // introducem noul nod si resortam alfabetic
   serviceNodes.push_back(node);
-  std::sort(serviceNodes.begin(), serviceNodes.end(),
-            [](const PeerDescriptor &a, const PeerDescriptor &b) {
-              return a.ID < b.ID;
-            });
+  std::ranges::sort(serviceNodes,
+                    [](const PeerDescriptor &a, const PeerDescriptor &b) {
+                      return a.ID < b.ID;
+                    });
 }
 
 std::vector<PeerDescriptor> hashRing::Nodes() const {
-  std::lock_guard<std::mutex> lock(threadMutex);
+  std::lock_guard lock(threadMutex);
   return serviceNodes;
 }

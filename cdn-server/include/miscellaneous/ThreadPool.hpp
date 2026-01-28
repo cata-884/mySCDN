@@ -18,7 +18,7 @@ private:
       std::function<void()> task;
       bool found = false;
       {
-        std::lock_guard<std::mutex> lock(this->queue_mutex);
+        std::lock_guard lock(this->queue_mutex);
 
         if (this->stop && this->tasks.empty())
           return;
@@ -39,7 +39,7 @@ private:
   }
 
 public:
-  ThreadPool(size_t numThreads) : stop(false) {
+  explicit ThreadPool(const size_t numThreads) : stop(false) {
     for (size_t i = 0; i < numThreads; ++i) {
       // spune explicit ca va executa doar workerLoop si ii dam obiectul pentru
       // a avea acces la tasks
@@ -47,8 +47,8 @@ public:
     }
   }
 
-  void Enqueue(std::function<void()> task) {
-    std::lock_guard<std::mutex> lock(queue_mutex);
+  void Enqueue(const std::function<void()> &task) {
+    std::lock_guard lock(queue_mutex);
     if (!stop) {
       tasks.push(task);
     }
@@ -56,7 +56,7 @@ public:
 
   ~ThreadPool() {
     {
-      std::lock_guard<std::mutex> lock(queue_mutex);
+      std::lock_guard lock(queue_mutex);
       stop = true;
     }
     // un wait pentru threaduri, asteptam ca munca sa se opreasca

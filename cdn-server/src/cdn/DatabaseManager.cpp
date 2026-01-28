@@ -17,7 +17,7 @@
 
 DatabaseManager::DatabaseManager(const std::string &path) : conn_ptr(nullptr) {
   // return code
-  int ret_val = sqlite3_open(path.c_str(), &conn_ptr);
+  const int ret_val = sqlite3_open(path.c_str(), &conn_ptr);
 
   throwIF(ret_val != SQLITE_OK,
           std::string("[DB ERROR] Nu pot deschide baza de date: ") +
@@ -32,37 +32,37 @@ DatabaseManager::~DatabaseManager() {
   }
 }
 
-void DatabaseManager::create_tables_if_not_exist() {
+void DatabaseManager::create_tables_if_not_exist() const {
   // access_logs = {id, node_id, file_name, client_ip, timestamp}
-  const char *str_sql_logs =
+  const auto str_sql_logs =
       "CREATE TABLE IF NOT EXISTS access_logs (id INTEGER PRIMARY KEY "
       "AUTOINCREMENT, node_id TEXT NOT NULL, file_name TEXT NOT NULL, "
       "client_ip TEXT NOT NULL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);";
   // catalog = {file_name, node_id}
-  const char *str_sql_catalog =
+  const auto str_sql_catalog =
       "CREATE TABLE IF NOT EXISTS file_catalog (file_name TEXT PRIMARY KEY, "
       "node_id TEXT NOT NULL);";
 
-  const char *str_sql_users = "CREATE TABLE IF NOT EXISTS users ("
+  const auto str_sql_users = "CREATE TABLE IF NOT EXISTS users ("
                               "username TEXT PRIMARY KEY, "
                               "password_hash TEXT NOT NULL, "
                               "salt TEXT NOT NULL, "
                               "role TEXT NOT NULL);";
 
   char *errMsg = nullptr;
-  sqlite3_exec(conn_ptr, str_sql_users, 0, 0, &errMsg);
+  sqlite3_exec(conn_ptr, str_sql_users, nullptr, nullptr, &errMsg);
   if (errMsg) {
     std::cerr << "[DB ERROR] Nu s-a putut crea tabela users: " << errMsg
               << "\n";
     sqlite3_free(errMsg);
   }
 
-  sqlite3_exec(conn_ptr, str_sql_logs, 0, 0, &errMsg);
+  sqlite3_exec(conn_ptr, str_sql_logs, nullptr, nullptr, &errMsg);
   if (errMsg) {
     std::cerr << "[DB ERROR] Nu s-a putut crea access_logs: " << errMsg << "\n";
     sqlite3_free(errMsg);
   }
-  sqlite3_exec(conn_ptr, str_sql_catalog, 0, 0, &errMsg);
+  sqlite3_exec(conn_ptr, str_sql_catalog, nullptr, nullptr, &errMsg);
   if (errMsg) {
     std::cerr << "[DB ERROR] Nu s-a putut crea file_catalog: " << errMsg
               << "\n";
@@ -75,10 +75,10 @@ void DatabaseManager::LogAccess(const std::string &id_nod,
                                 const std::string &ipAddress) {
   if (!conn_ptr)
     return;
-  std::lock_guard<std::mutex> guard(m_mutex);
+  std::lock_guard guard(m_mutex);
 
   sqlite3_stmt *prepared_stmt;
-  const char *query = "INSERT INTO access_logs (node_id, file_name, client_ip) "
+  const auto query = "INSERT INTO access_logs (node_id, file_name, client_ip) "
                       "VALUES (?, ?, ?);";
   if (sqlite3_prepare_v2(conn_ptr, query, -1, &prepared_stmt, nullptr) !=
       SQLITE_OK)
@@ -99,10 +99,10 @@ void DatabaseManager::RegisterFile(const std::string &node_identificator,
                                    const std::string &nume_fisier) {
   if (!conn_ptr)
     return;
-  std::lock_guard<std::mutex> guard(m_mutex);
+  std::lock_guard guard(m_mutex);
 
   sqlite3_stmt *stmt_insert;
-  const char *sql_command =
+  const auto sql_command =
       "INSERT OR REPLACE INTO file_catalog (file_name, node_id) VALUES (?, ?);";
   if (sqlite3_prepare_v2(conn_ptr, sql_command, -1, &stmt_insert, nullptr) !=
       SQLITE_OK)
@@ -119,12 +119,12 @@ void DatabaseManager::RegisterFile(const std::string &node_identificator,
 }
 
 std::vector<std::pair<std::string, std::string>> DatabaseManager::GetCatalog() {
-  std::lock_guard<std::mutex> lk(m_mutex);
+  std::lock_guard lk(m_mutex);
   std::vector<std::pair<std::string, std::string>> result_vector;
   if (!conn_ptr)
     return result_vector;
 
-  std::string sql_select =
+  const std::string sql_select =
       "SELECT file_name, node_id FROM file_catalog ORDER BY file_name ASC;";
   sqlite3_stmt *stmt;
   if (sqlite3_prepare_v2(conn_ptr, sql_select.c_str(), -1, &stmt, nullptr) !=
@@ -133,9 +133,9 @@ std::vector<std::pair<std::string, std::string>> DatabaseManager::GetCatalog() {
   // sqlite3_step(stmt) executa comanda si returneaza un rand
   // exec - prepare->step->finalize, bun pentru comenzi statice
   while (sqlite3_step(stmt) == SQLITE_ROW) {
-    std::string fisier = std::string(
+    auto fisier = std::string(
         reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
-    std::string nod_sursa = std::string(
+    auto nod_sursa = std::string(
         reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1)));
     result_vector.emplace_back(fisier, nod_sursa);
   }
@@ -144,13 +144,13 @@ std::vector<std::pair<std::string, std::string>> DatabaseManager::GetCatalog() {
 }
 
 std::vector<std::pair<std::string, int>>
-DatabaseManager::top_files(int limit_count) {
-  std::lock_guard<std::mutex> lock(m_mutex);
+DatabaseManager::top_files(const int limit_count) {
+  std::lock_guard lock(m_mutex);
   std::vector<std::pair<std::string, int>> output_list;
   if (!conn_ptr)
     return output_list;
   // de cate ori apare fiecare fisier in log-uri
-  std::string complex_q =
+  const std::string complex_q =
       "SELECT file_name, COUNT(*) as hit_count FROM access_logs "
       "GROUP BY file_name "
       "ORDER BY hit_count DESC "
@@ -177,15 +177,15 @@ DatabaseManager::top_files(int limit_count) {
 }
 
 std::string DatabaseManager::get_owner_id(const std::string &f_name) {
-  std::lock_guard<std::mutex> lock(m_mutex);
+  std::lock_guard lock(m_mutex);
   if (!conn_ptr)
     return "";
-  std::string q = "SELECT node_id FROM file_catalog WHERE file_name = ?;";
+  const std::string q = "SELECT node_id FROM file_catalog WHERE file_name = ?;";
   sqlite3_stmt *st;
   if (sqlite3_prepare_v2(conn_ptr, q.c_str(), -1, &st, nullptr) != SQLITE_OK)
     return "";
   sqlite3_bind_text(st, 1, f_name.c_str(), -1, SQLITE_STATIC);
-  std::string owner = "";
+  std::string owner;
   if (sqlite3_step(st) == SQLITE_ROW) {
     owner =
         std::string(reinterpret_cast<const char *>(sqlite3_column_text(st, 0)));
@@ -196,12 +196,12 @@ std::string DatabaseManager::get_owner_id(const std::string &f_name) {
 // access_logs = {id, node_id, file_name, client_ip, timestamp}
 
 std::vector<LogEntry> DatabaseManager::getLogs() {
-  std::lock_guard<std::mutex> lock(m_mutex);
+  std::lock_guard lock(m_mutex);
   std::vector<LogEntry> res;
   if (!conn_ptr)
     return res;
 
-  std::string q = "SELECT id, node_id, file_name, client_ip, strftime('%s', "
+  const std::string q = "SELECT id, node_id, file_name, client_ip, strftime('%s', "
                   "timestamp) FROM access_logs ORDER BY id ASC;";
 
   sqlite3_stmt *st;
@@ -217,9 +217,9 @@ std::vector<LogEntry> DatabaseManager::getLogs() {
         std::string(reinterpret_cast<const char *>(sqlite3_column_text(st, 2)));
     entry.client_ip =
         std::string(reinterpret_cast<const char *>(sqlite3_column_text(st, 3)));
-    long long secunde = sqlite3_column_int64(st, 4);
+    const long long secunde = sqlite3_column_int64(st, 4);
     entry.time = std::chrono::system_clock::from_time_t(
-        static_cast<std::time_t>(secunde));
+        secunde);
     res.emplace_back(entry);
   }
   sqlite3_finalize(st);
@@ -231,13 +231,13 @@ bool DatabaseManager::CreateUser(const std::string &user,
                                  const std::string &role) {
   if (!conn_ptr)
     return false;
-  std::lock_guard<std::mutex> guard(m_mutex);
+  std::lock_guard guard(m_mutex);
 
-  std::string salt = SecurityUtils::GenerateSalt();
-  std::string hash = SecurityUtils::HashPassword(pass, salt);
+  const std::string salt = SecurityUtils::GenerateSalt();
+  const std::string hash = SecurityUtils::HashPassword(pass, salt);
 
   sqlite3_stmt *stmt;
-  const char *sql = "INSERT INTO users (username, password_hash, salt, role) "
+  const auto sql = "INSERT INTO users (username, password_hash, salt, role) "
                     "VALUES (?, ?, ?, ?);";
 
   if (sqlite3_prepare_v2(conn_ptr, sql, -1, &stmt, nullptr) != SQLITE_OK)
@@ -261,11 +261,11 @@ bool DatabaseManager::CreateUser(const std::string &user,
 
 std::string DatabaseManager::CheckLogin(const std::string &user,
                                         const std::string &pass) {
-  std::lock_guard<std::mutex> guard(m_mutex);
+  std::lock_guard guard(m_mutex);
   if (!conn_ptr)
     return "";
 
-  const char *sql =
+  const auto sql =
       "SELECT password_hash, salt, role FROM users WHERE username = ?;";
   sqlite3_stmt *stmt;
   if (sqlite3_prepare_v2(conn_ptr, sql, -1, &stmt, nullptr) != SQLITE_OK)
@@ -273,13 +273,13 @@ std::string DatabaseManager::CheckLogin(const std::string &user,
 
   sqlite3_bind_text(stmt, 1, user.c_str(), -1, SQLITE_STATIC);
 
-  std::string found_role = "";
+  std::string found_role;
   if (sqlite3_step(stmt) == SQLITE_ROW) {
-    std::string db_hash =
+    const std::string db_hash =
         reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
-    std::string db_salt =
+    const std::string db_salt =
         reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
-    std::string db_role =
+    const std::string db_role =
         reinterpret_cast<const char *>(sqlite3_column_text(stmt, 2));
 
     // Verificam hash-ul

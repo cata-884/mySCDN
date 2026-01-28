@@ -5,7 +5,7 @@
 #include "network/TcpSocket.hpp"
 #include <iostream>
 #include <memory>
-#include <signal.h>
+#include <csignal>
 
 int main(int argc, char *argv[]) {
   signal(SIGPIPE, SIG_IGN);
@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
     tcpServer.Start(config.ipAddress, config.port);
     // aflam cat threaduri putem folosi
     unsigned int threaduriPosibile = std::thread::hardware_concurrency();
-    size_t poolSize = (threaduriPosibile > 0) ? threaduriPosibile * 2 : 20;
+    size_t poolSize = threaduriPosibile > 0 ? threaduriPosibile * 2 : 20;
     ThreadPool pool(poolSize);
 
     std::cout << "Nodul " << config.nodeId << " ruleaza..." << std::endl;
@@ -24,14 +24,14 @@ int main(int argc, char *argv[]) {
               << std::endl;
     std::cout << "   -> Thread Pool Size: " << poolSize << std::endl;
 
-    while (1) {
+    while (true) {
       TcpSocket clientSocket = tcpServer.Accept();
       // folosim shared pointer deoarece std::function cere ca tot ce pui in el
       // sa fie copiabil, lucru pe care TcpSocket nu il are(putem face doar
       // move)
-      std::shared_ptr<TcpSocket> socketPtr =
+      const auto socketPtr =
           std::make_shared<TcpSocket>(std::move(clientSocket));
-      pool.Enqueue([&cdnNode, socketPtr]() {
+      pool.Enqueue([&cdnNode, socketPtr] {
         cdnNode.StartClientLoop(std::move(*socketPtr), nullptr);
       });
     }
@@ -40,5 +40,4 @@ int main(int argc, char *argv[]) {
     std::cerr << "Eroare: " << e.what() << std::endl;
     return 1;
   }
-  return 0;
 }

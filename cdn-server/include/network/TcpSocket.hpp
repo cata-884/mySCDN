@@ -6,7 +6,7 @@
 
 class TcpSocket {
   int sockFD = -1;
-  std::string ip = "";
+  std::string ip;
   std::uint16_t port = 0;
   explicit TcpSocket(int sockFD, std::string ip, std::uint16_t port);
 
@@ -20,18 +20,18 @@ public:
   TcpSocket(TcpSocket &&other) noexcept;
   TcpSocket &operator=(TcpSocket &&other) noexcept;
   // abstractizari
-  void Bind(std::uint16_t port, const std::string &ipAdress = "0.0.0.0");
+  void Bind(std::uint16_t _port, const std::string &ipAdress = "0.0.0.0") const;
   void Listen(int backlog = 64) const;
-  TcpSocket Accept() const;
+  [[nodiscard]] TcpSocket Accept() const;
   void Connect(std::uint16_t port, const std::string &ipAdress);
   void Close();
   void SendAll(const std::string &mesaj) const;
   void SendAll(const void *mesaj, std::size_t len) const;
-  std::string recvLine(std::size_t len = 4096) const;
-  std::string recvN(std::size_t len) const;
-  bool isValid() const;
-  int getSockFD() const { return sockFD; }
+  [[nodiscard]] std::string recvLine(std::size_t len = 4096) const;
+  [[nodiscard]] std::string recvN(std::size_t len) const;
+  [[nodiscard]] bool isValid() const;
+  [[nodiscard]] int getSockFD() const { return sockFD; }
   std::size_t Recv(void *buffer, std::size_t len) const;
-  std::string getIP() const { return ip; }
-  std::uint16_t getPort() const { return port; }
+  [[nodiscard]] std::string getIP() const { return ip; }
+  [[nodiscard]] std::uint16_t getPort() const { return port; }
 };
