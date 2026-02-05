@@ -1,6 +1,6 @@
 #include "cdn/Database.hpp"
-#include "miscellaneous/ErrorHandling.hpp"
-#include "miscellaneous/Security.hpp"
+#include "utils/ErrorHandling.hpp"
+#include "utils/Security.hpp"
 #include <cstdlib>
 #include <iostream>
 #include <mutex>

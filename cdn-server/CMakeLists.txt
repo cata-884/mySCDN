@@ -4,7 +4,7 @@ project(cdn-server VERSION 0.2 LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MSVC)
@@ -34,7 +34,7 @@ set(SERVER_SOURCES
     src/cdn/LoadMonitor.cpp
     src/cdn/NodeConfig.cpp
     src/cdn/NodeServer.cpp
-    src/network/TcpServer.cpp
+        src/network/TcpListener.cpp
     src/network/TcpSocket.cpp
 )
 

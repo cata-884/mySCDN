@@ -1,6 +1,6 @@
 #include "cdn/NodeConfig.hpp"
 #include "cdn/Types.hpp"
-#include "miscellaneous/ErrorHandling.hpp"
+#include "utils/ErrorHandling.hpp"
 #include <string>
 #include <vector>
 

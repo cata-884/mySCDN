@@ -1,37 +1,54 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <string>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <expected>
+#include <liburing.h>
+#include <span>
 
-class TcpSocket {
-  int sockFD = -1;
-  std::string ip;
-  std::uint16_t port = 0;
-  explicit TcpSocket(int sockFD, std::string ip, std::uint16_t port);
+namespace cdn::net {
 
-public:
-  // clasic oop
-  TcpSocket();
-  ~TcpSocket();
-  // RAII
-  TcpSocket(const TcpSocket &sockFD) = delete;
-  TcpSocket &operator=(const TcpSocket &) = delete;
-  TcpSocket(TcpSocket &&other) noexcept;
-  TcpSocket &operator=(TcpSocket &&other) noexcept;
-  // abstractizari
-  void Bind(std::uint16_t _port, const std::string &ipAdress = "0.0.0.0") const;
-  void Listen(int backlog = 64) const;
-  [[nodiscard]] TcpSocket Accept() const;
-  void Connect(std::uint16_t port, const std::string &ipAdress);
-  void Close();
-  void SendAll(const std::string &mesaj) const;
-  void SendAll(const void *mesaj, std::size_t len) const;
-  [[nodiscard]] std::string recvLine(std::size_t len = 4096) const;
-  [[nodiscard]] std::string recvN(std::size_t len) const;
-  [[nodiscard]] bool isValid() const;
-  [[nodiscard]] int getSockFD() const { return sockFD; }
-  std::size_t Recv(void *buffer, std::size_t len) const;
-  [[nodiscard]] std::string getIP() const { return ip; }
-  [[nodiscard]] std::uint16_t getPort() const { return port; }
-};
+  enum class OpType : uint8_t {
+    ACCEPT,
+    RECV,
+    SEND,
+    CONNECT,
+    CLOSE
+  };
+  struct alignas(64) IoContext{
+
+    std::span<char> buffer;
+    uint64_t connection_id{0};
+    sockaddr_in client_addr;
+
+    int fd{-1};
+    int32_t result{0};
+
+    OpType op_type;
+    socklen_t addr_len{sizeof(sockaddr_in)};
+
+  };
+  class TcpSocket {
+  public:
+    using Result = std::expected<void, int>;
+
+    TcpSocket(const int fd, io_uring* ring) : m_fd(fd), m_ring(ring) {}
+    ~TcpSocket();
+
+    TcpSocket(const TcpSocket &m_fd) = delete;
+    TcpSocket &operator=(const TcpSocket &) = delete;
+
+    TcpSocket(TcpSocket &&other) noexcept;
+    TcpSocket &operator=(TcpSocket &&other) noexcept;
+
+    [[nodiscard]] int fd() const {return m_fd;}
+    Result submit_recv(IoContext* io_context) const;
+    Result submit_send(IoContext* io_context) const;
+    Result submit_accept(IoContext* io_context) const;
+
+  private:
+    int m_fd{-1};
+    io_uring* m_ring{nullptr};
+  };
+
+}

@@ -1,7 +1,7 @@
 #include "cdn/NodeConfig.hpp"
 #include "cdn/NodeServer.hpp"
-#include "miscellaneous/ThreadPool.hpp"
-#include "network/TcpServer.hpp"
+#include "utils/ThreadPool.hpp"
+#include "network/TcpListener.hpp"
 #include "network/TcpSocket.hpp"
 #include <iostream>
 #include <memory>
@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
   try {
     NodeConfig config = ParseArguments(argc, argv);
     NodeServer cdnNode(config);
-    TcpServer tcpServer;
+    TcpListener tcpServer;
     tcpServer.Start(config.ipAddress, config.port);
     // aflam cat threaduri putem folosi
     unsigned int threaduriPosibile = std::thread::hardware_concurrency();
