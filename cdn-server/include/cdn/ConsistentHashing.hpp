@@ -1,21 +1,23 @@
 #pragma once
 
+#include <map>
+
 #include "cdn/Types.hpp"
 
 #include "cdn/NodeConfig.hpp"
-#include <mutex>
 #include <string>
 #include <vector>
 
-class hashRing {
-private:
-  std::vector<PeerDescriptor> serviceNodes;
-  mutable std::mutex threadMutex;
+class ConsistentHashing {
 
 public:
-  explicit hashRing(const NodeConfig &config);
+  explicit ConsistentHashing(const NodeConfig &config);
   PeerDescriptor Locate(const std::string &resursa) const;
   PeerDescriptor NextAfter(const std::string &idNod) const;
   std::vector<PeerDescriptor> Nodes() const;
   void AddNode(const PeerDescriptor &node);
+
+private:
+  int m_virtualNodes;  //virtual nodes per real node
+  std::map<size_t, std::string> m_ring;
 };

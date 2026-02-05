@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-namespace cdn::net {
     std::expected<int, int> TcpListener::create(const uint16_t port, const bool non_blocking) {
 
         const int fd = ::socket(AF_INET6, SOCK_STREAM, 0);
@@ -55,4 +54,3 @@ namespace cdn::net {
         return fd;
 
     }
-}

@@ -20,7 +20,7 @@ std::size_t HasheazaResursa(const std::string &text) {
 // avem nevoie de o hashare determinista pentru a nu avea situatii de tipul:
 // server A(node1) - (node1, node2, node3, ...)
 // server B(node2) - (node3, node1, node2, ...)
-hashRing::hashRing(const NodeConfig &config)
+ConsistentHashing::ConsistentHashing(const NodeConfig &config)
     : serviceNodes(config.peersVector) {
   throwIF(serviceNodes.empty(), "Hashring necesita macar un nod");
   // sortam alfabetic pentru a asigura structura node1 => node2 => ...
@@ -32,14 +32,14 @@ hashRing::hashRing(const NodeConfig &config)
 
 // folosit pentru identificarea carui nod este responsabil, DACA nodul este
 // online. daca e offline, se recalculeaza distributia
-PeerDescriptor hashRing::Locate(const std::string &resursa) const {
+PeerDescriptor ConsistentHashing::Locate(const std::string &resursa) const {
   std::lock_guard lock(threadMutex);
   const std::size_t valoareHash = HasheazaResursa(resursa);
   const std::size_t index = valoareHash % serviceNodes.size();
   return serviceNodes[index];
 }
 // vecinul idNod-ului
-PeerDescriptor hashRing::NextAfter(const std::string &idNod) const {
+PeerDescriptor ConsistentHashing::NextAfter(const std::string &idNod) const {
   std::lock_guard lock(threadMutex);
   if (serviceNodes.size() <= 1)
     return PeerDescriptor{};
@@ -51,7 +51,7 @@ PeerDescriptor hashRing::NextAfter(const std::string &idNod) const {
   return serviceNodes[0];
 }
 
-void hashRing::AddNode(const PeerDescriptor &node) {
+void ConsistentHashing::AddNode(const PeerDescriptor &node) {
   std::lock_guard lock(threadMutex);
   for (const auto &n : serviceNodes) {
     if (n.ID == node.ID)
@@ -65,7 +65,7 @@ void hashRing::AddNode(const PeerDescriptor &node) {
                     });
 }
 
-std::vector<PeerDescriptor> hashRing::Nodes() const {
+std::vector<PeerDescriptor> ConsistentHashing::Nodes() const {
   std::lock_guard lock(threadMutex);
   return serviceNodes;
 }
