@@ -1,71 +1,56 @@
-#include "cdn/HashRing.hpp"
+#include "cdn/ConsistentHashing.hpp"
 #include "cdn/NodeConfig.hpp"
 #include "cdn/Types.hpp"
-#include "utils/ErrorHandling.hpp"
 #include <algorithm>
-#include <cstddef>
-//"ceva.mp3" => Σ (int)c
-// daca Serverul A și Serverul B calculează hash-ul pentru "video.mp4", ambele
-// vor obtine exact acelasi numar. Acest lucru este critic pentru ca toate
-// nodurile să fie de acord asupra locației fișierului
+#include <mutex>
 
-std::size_t HasheazaResursa(const std::string &text) {
-  std::size_t sum = 0;
-  for (const char c : text) {
-    sum += static_cast<unsigned char>(c);
+size_t hash(const std::string& key) {
+  return std::hash<std::string>{}(key);
+}
+ConsistentHashing::ConsistentHashing(const int virtualNodes, const NodeConfig &config) : m_virtual_nodes(virtualNodes) {
+  for (const auto& peer : config.m_peers) {
+    addNode(peer);
   }
-  return sum;
 }
 
-// avem nevoie de o hashare determinista pentru a nu avea situatii de tipul:
-// server A(node1) - (node1, node2, node3, ...)
-// server B(node2) - (node3, node1, node2, ...)
-ConsistentHashing::ConsistentHashing(const NodeConfig &config)
-    : serviceNodes(config.peersVector) {
-  throwIF(serviceNodes.empty(), "Hashring necesita macar un nod");
-  // sortam alfabetic pentru a asigura structura node1 => node2 => ...
-  std::ranges::sort(serviceNodes,
-                    [](const PeerDescriptor &a, const PeerDescriptor &b) {
-                      return a.ID < b.ID;
-                    });
-}
+void ConsistentHashing::addNode(const PeerDescriptor &peer) {
+  std::unique_lock lock(m_mutex);
 
-// folosit pentru identificarea carui nod este responsabil, DACA nodul este
-// online. daca e offline, se recalculeaza distributia
-PeerDescriptor ConsistentHashing::Locate(const std::string &resursa) const {
-  std::lock_guard lock(threadMutex);
-  const std::size_t valoareHash = HasheazaResursa(resursa);
-  const std::size_t index = valoareHash % serviceNodes.size();
-  return serviceNodes[index];
-}
-// vecinul idNod-ului
-PeerDescriptor ConsistentHashing::NextAfter(const std::string &idNod) const {
-  std::lock_guard lock(threadMutex);
-  if (serviceNodes.size() <= 1)
-    return PeerDescriptor{};
-  for (std::size_t i = 0; i < serviceNodes.size(); i++) {
-    if (serviceNodes[i].ID == idNod) {
-      return serviceNodes[(i + 1) % serviceNodes.size()];
-    }
+  for (int i = 0; i < m_virtual_nodes; i++) {
+    std::string v_node_key = peer.ID + "#" + std::to_string(i);
+    const size_t h = hash(v_node_key);
+
+    m_ring.push_back({h, peer});
   }
-  return serviceNodes[0];
+
+  std::sort(m_ring.begin(), m_ring.end());
 }
 
-void ConsistentHashing::AddNode(const PeerDescriptor &node) {
-  std::lock_guard lock(threadMutex);
-  for (const auto &n : serviceNodes) {
-    if (n.ID == node.ID)
-      return;
+void ConsistentHashing::removeNode(const std::string &nodeID) {
+  std::unique_lock lock(m_mutex);
+
+  const auto newEnd = std::ranges::remove_if(m_ring,
+                                       [&](const RingEntry& entry) {
+                                         return entry.m_peer.ID == nodeID;
+                                       }).begin();
+
+  m_ring.erase(newEnd, m_ring.end());
+}
+
+PeerDescriptor ConsistentHashing::getNode(const std::string &key) {
+  std::shared_lock lock(m_mutex);
+
+  if (m_ring.empty()) return PeerDescriptor{};
+
+  const size_t h = hash(key);
+
+  const auto it = std::lower_bound(m_ring.begin(), m_ring.end(), h,
+      [](const RingEntry& entry, const size_t val) {
+          return entry.m_hash < val;
+      });
+
+  if (it == m_ring.end()) {
+    return m_ring.front().m_peer;
   }
-  // introducem noul nod si resortam alfabetic
-  serviceNodes.push_back(node);
-  std::ranges::sort(serviceNodes,
-                    [](const PeerDescriptor &a, const PeerDescriptor &b) {
-                      return a.ID < b.ID;
-                    });
-}
-
-std::vector<PeerDescriptor> ConsistentHashing::Nodes() const {
-  std::lock_guard lock(threadMutex);
-  return serviceNodes;
+  return it->m_peer;
 }

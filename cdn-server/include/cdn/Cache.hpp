@@ -1,51 +1,69 @@
 #pragma once
 
-#include "NodeConfig.hpp"
-#include <chrono>
-#include <cstddef>
+#include "cdn/NodeConfig.hpp"
+#include <vector>
 #include <list>
-#include <memory>
-#include <mutex>
-#include <string>
 #include <unordered_map>
-#include <utility>
+#include <mutex>
+#include <memory>
+#include <chrono>
+#include <string>
 
-struct cacheEntry {
-  std::string payload;
-  // todo: trecere la steady_clock?
-  // primit de la NodeConfig
-  std::chrono::system_clock::time_point expiryTime;
-  std::size_t sizeInBytes;
-  cacheEntry() : sizeInBytes(0) {}
+namespace cdn {
 
-  cacheEntry(std::string p, const std::chrono::system_clock::time_point t,
-             const std::size_t s)
-      : payload(std::move(p)), expiryTime(t), sizeInBytes(s) {}
-};
+  using Clock = std::chrono::steady_clock;
 
-class cacheStore {
-private:
-  std::size_t maxCapacityBytes;
-  std::size_t currentUsageBytes;
-  std::chrono::seconds defaultTTL;
-  // race condition
-  mutable std::mutex threadSafetyMutex;
-  // lista dublu inlantuita care tine minte ordinea fisierelor folosite. front -
-  // VIP access, back - LRU si candidat la stergere
-  std::list<std::string> listaLRU;
-  // mapKey - denumirea fisierului ("video.mp4")
-  // mapValue - pereche de list::iterator, pentru a-l muta in fata si CacheEntry
-  // pentru a obtine datele efective, ca si sizeBytes si cacheValue
-  using LruIterator = std::list<std::string>::iterator;
-  std::unordered_map<std::string, std::pair<LruIterator, cacheEntry>> lookupMap;
-  // for debugging
-  // mutable cacheStats stats;
-public:
-  explicit cacheStore(const NodeConfig &config);
-  std::unique_ptr<std::string> Get(const std::string &key);
-  void Put(const std::string &key, std::string &value);
-  void Remove(const std::string &key);
-};
+  struct CacheEntry {
+    std::shared_ptr<std::string> m_payload;
+    Clock::time_point m_expiry_time;
+    std::size_t m_payload_size;
 
-// ENTRY1 <-> ENTRY2 <-> ENTRY3
-// FRONT                 BACK
+    CacheEntry(const std::shared_ptr<std::string> &p, const Clock::time_point t, const std::size_t s) : m_payload(p),
+    m_expiry_time(t), m_payload_size(s) {}
+  };
+
+  struct alignas(64) CacheShard {
+    public:
+    explicit CacheShard(std::size_t capacity);
+
+    std::shared_ptr<std::string> get(const std::string& key);
+    void put(const std::string& key, const std::string& data, std::chrono::seconds ttl);
+
+    private:
+    std::size_t maxCapacityBytes;
+    std::size_t currentUsageBytes;
+    std::size_t protectedCapacity;
+
+    mutable std::mutex shardMutex;
+
+    std::list<std::string> probationList;
+    std::list<std::string> protectedList;
+
+    struct MapValue {
+      std::list<std::string>::iterator listIt;
+      bool isProtected{};
+      CacheEntry entry;
+    };
+
+    std::unordered_map<std::string, MapValue> lookup;
+
+    void remove_internal(std::unordered_map<std::string, MapValue>::iterator it);
+    void evict_if_needed();
+  };
+
+  class HybridCache {
+  public:
+    explicit HybridCache(const NodeConfig& config, std::size_t shardsCount = 64);
+
+    std::shared_ptr<std::string> Get(const std::string& key);
+    void Put(const std::string& key, const std::string& value);
+
+  private:
+    std::vector<std::unique_ptr<CacheShard>> shards;
+    std::size_t numShards;
+    std::chrono::seconds defaultTTL;
+
+    [[nodiscard]] CacheShard& get_shard(const std::string& key) const;
+  };
+
+}

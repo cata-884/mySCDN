@@ -1,43 +1,38 @@
 #include "cdn/NodeConfig.hpp"
 #include "cdn/NodeServer.hpp"
-#include "utils/ThreadPool.hpp"
 #include "network/TcpListener.hpp"
 #include "network/TcpSocket.hpp"
 #include <iostream>
 #include <memory>
 #include <csignal>
+#include <thread>
 
-int main(int argc, char *argv[]) {
+void pin_thread_to_core(const unsigned int core_id) {
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(core_id, &cpuset);
+  pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+}
+
+int main(const int argc, char *argv[]) {
   signal(SIGPIPE, SIG_IGN);
   try {
-    NodeConfig config = ParseArguments(argc, argv);
-    NodeServer cdnNode(config);
-    TcpListener tcpServer;
-    tcpServer.Start(config.ipAddress, config.port);
-    // aflam cat threaduri putem folosi
-    unsigned int threaduriPosibile = std::thread::hardware_concurrency();
-    size_t poolSize = threaduriPosibile > 0 ? threaduriPosibile * 2 : 20;
-    ThreadPool pool(poolSize);
+    const NodeConfig config = ParseArguments(argc, argv);
+    const unsigned int num_cores = std::thread::hardware_concurrency();
+    std::vector<std::thread> workers;
 
-    std::cout << "Nodul " << config.nodeId << " ruleaza..." << std::endl;
-    std::cout << "   -> Max Conexiuni Logice: " << config.maxConexiuni
-              << std::endl;
-    std::cout << "   -> Thread Pool Size: " << poolSize << std::endl;
-
-    while (true) {
-      TcpSocket clientSocket = tcpServer.Accept();
-      // folosim shared pointer deoarece std::function cere ca tot ce pui in el
-      // sa fie copiabil, lucru pe care TcpSocket nu il are(putem face doar
-      // move)
-      const auto socketPtr =
-          std::make_shared<TcpSocket>(std::move(clientSocket));
-      pool.Enqueue([&cdnNode, socketPtr] {
-        cdnNode.StartClientLoop(std::move(*socketPtr), nullptr);
+    for (unsigned int i=0; i < num_cores; i++) {
+      workers.emplace_back([config, i] {
+        pin_thread_to_core(i);
+        NodeServer worker(config);
+        worker.RunEventLoop();
       });
     }
-
+    for (auto& t : workers) {
+      if (t.joinable()) t.join();
+    }
   } catch (const std::exception &e) {
-    std::cerr << "Eroare: " << e.what() << std::endl;
+    std::cerr << "Error: " << e.what() << std::endl;
     return 1;
   }
 }
