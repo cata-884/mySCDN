@@ -289,12 +289,13 @@ TcpSocket connectAndAuth(const std::string &ip, uint16_t port,
 
 void print_help() {
   std::cout << "\n--- Audio Player Client ---\n";
-  std::cout << "  auth <user> <pass> : Logare\n";
-  std::cout << "  catalog            : Lista fisiere\n";
-  std::cout << "  get <fisier>       : Descarca (suporta spatii)\n";
-  std::cout << "  play               : Reda ultima melodie\n";
-  std::cout << "  quit               : Iesire\n";
-  std::cout << "---------------------------\n";
+  std::cout << "  register <user> <pass> : Creare cont nou\n";
+  std::cout << "  auth <user> <pass>     : Logare\n";
+  std::cout << "  catalog                : Lista fisiere\n";
+  std::cout << "  get <fisier>           : Descarca (suporta spatii)\n";
+  std::cout << "  play                   : Reda ultima melodie\n";
+  std::cout << "  quit                   : Iesire\n";
+  std::cout << "-------------------------------\n";
 }
 int main(int argc, char *argv[]) {
 
@@ -338,7 +339,28 @@ int main(int argc, char *argv[]) {
     }
 
     try {
-      if (cmd == "auth") {
+      if (cmd == "register") {
+        std::string u, p;
+        iss >> u >> p;
+        if (u.empty() || p.empty()) {
+          std::cout << "[Info] Folosire: register <username> <password>\n";
+          continue;
+        }
+
+        TcpSocket tmp;
+        tmp.Connect(dest_port, dest_ip);
+        tmp.SendAll("REGISTER " + u + " " + p + "\n");
+
+        std::string r = tmp.recvLine();
+        if (r.find("CREATED") != std::string::npos) {
+          std::cout << "Cont creat cu succes! Foloseste 'auth " << u
+                    << " <parola>' pentru logare.\n";
+        } else {
+          std::cout << "Eroare la register: " << r << "\n";
+        }
+      }
+
+      else if (cmd == "auth") {
         std::string u, p;
         iss >> u >> p;
         if (u.empty() || p.empty()) {

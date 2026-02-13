@@ -4,7 +4,6 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
-#include <shared_mutex>
 
 cacheStore::cacheStore(const NodeConfig &config)
     : maxCapacityBytes(config.cacheSize), currentUsageBytes(0),

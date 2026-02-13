@@ -12,8 +12,8 @@ std::size_t HasheazaResursa(std::string_view text) {
   constexpr std::size_t fnv_offset = 14695981039346656037ULL;
   constexpr std::size_t fnv_prime = 1099511628211ULL;
   std::size_t hash = fnv_offset;
-  for (const unsigned char c : text) {
-    hash ^= c;
+  for (auto c : text) {
+    hash ^= static_cast<std::size_t>(c);
     hash *= fnv_prime;
   }
   return hash;

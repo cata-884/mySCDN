@@ -11,7 +11,6 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <string_view>
 
 class NodeServer {
 private:
