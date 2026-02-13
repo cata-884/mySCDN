@@ -117,7 +117,7 @@ Porturile nodurilor: `8000`, ..., `8000 + N - 1`
 ./build/myscdn_node --node-id node2 --listen 127.0.0.1:8001 \
     --target-files ../data/storage --db-path /tmp/myscdn/CDN.db \
     --max-connections 20 --cache-bytes 104857600 --ttl 3600 \
-    --cluster-node node1@127.0.0.1:8000Continue
+    --cluster-node node1@127.0.0.1:8000
 ```
 
 ## Protocol
