@@ -4,54 +4,45 @@
 loadMonitor::loadMonitor(const NodeConfig &config) noexcept
     : conexiuniMaxime(config.maxConexiuni) {}
 
-// replicam std::mutex si distrugerea automata fara a apela explicit un
-// destructor cand avem return sau throw
 loadMonitor::ticket loadMonitor::tryAquire() {
-  std::lock_guard lock(m_mutex);
-
-  if (clientiConectati < conexiuniMaxime) {
-    clientiConectati++;
-    // shared_from_this() ne permite sa avem o instanta de shared pointer atunci
-    // cand tot ce avem e this. vrem mereu sa tinem minte originalul
-    return ticket(shared_from_this());
+  std::size_t current = clientiConectati.load(std::memory_order_relaxed);
+  while (current < conexiuniMaxime) {
+    if (clientiConectati.compare_exchange_weak(current, current + 1,
+                                               std::memory_order_acq_rel,
+                                               std::memory_order_relaxed)) {
+      return ticket(shared_from_this());
+    }
   }
-  // failure
   return ticket(nullptr);
 }
 
 void loadMonitor::Release() noexcept {
-  std::lock_guard lock(m_mutex);
-  if (conexiuniMaxime > 0 && clientiConectati > 0) {
-    clientiConectati--;
-  }
+  clientiConectati.fetch_sub(1, std::memory_order_acq_rel);
 }
 
 std::size_t loadMonitor::ActiveConnections() const noexcept {
-  std::lock_guard lock(m_mutex);
-  return clientiConectati;
+  return clientiConectati.load(std::memory_order_relaxed);
 }
 
 loadMonitor::ticket::ticket(std::shared_ptr<loadMonitor> ptr) noexcept
     : monitorPtr(std::move(ptr)) {}
 
 loadMonitor::ticket::ticket(ticket &&other) noexcept
-    : monitorPtr(std::move(other.monitorPtr)) {
-  // shared_ptr devine automat null dupa move, nu trebuie setat manual
-}
+    : monitorPtr(std::move(other.monitorPtr)) {}
 
 loadMonitor::ticket &loadMonitor::ticket::operator=(ticket &&other) noexcept {
   if (this != &other) {
-    // daca aveam un loc ocupat, il eliberam
+
     if (monitorPtr) {
       monitorPtr->Release();
     }
-    // furam pointerul
+
     monitorPtr = std::move(other.monitorPtr);
   }
   return *this;
 }
 loadMonitor::ticket::~ticket() {
-  // daca pointerul e valid, inseamna ca am avut loc => facem Release
+
   if (monitorPtr) {
     monitorPtr->Release();
   }

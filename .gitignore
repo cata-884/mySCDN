@@ -35,12 +35,9 @@ cdn-client/myscdn_client
 
 *.db
 *.sqlite
-cdn-server/data/*
 
-cdn-server/assets/*
-
-cdn-server/data/storage/*
-!cdn-server/data/storage/.gitkeep
+data/
+cdn-server/data/
 
 cdn-server/assets/targetFilesDistributed/
 targetFilesDistributed/

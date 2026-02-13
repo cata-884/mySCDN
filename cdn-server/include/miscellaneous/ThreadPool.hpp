@@ -1,6 +1,6 @@
 #pragma once
 
-#include <chrono>
+#include <condition_variable>
 #include <functional>
 #include <mutex>
 #include <queue>
@@ -10,48 +10,42 @@
 class ThreadPool {
 private:
   std::vector<std::thread> workers;
-  std::queue<std::function<void()>> tasks; // void (*task)();
+  std::queue<std::function<void()>> tasks;
   std::mutex queue_mutex;
+  std::condition_variable cv;
   bool stop;
+
   void WorkerLoop() {
     while (true) {
       std::function<void()> task;
-      bool found = false;
       {
-        std::lock_guard lock(this->queue_mutex);
-
+        std::unique_lock lock(this->queue_mutex);
+        this->cv.wait(lock,
+                      [this] { return this->stop || !this->tasks.empty(); });
         if (this->stop && this->tasks.empty())
           return;
-
-        if (!this->tasks.empty()) {
-          // luam functia cu prioritate maxima
-          task = std::move(this->tasks.front());
-          this->tasks.pop();
-          found = true;
-        }
+        task = std::move(this->tasks.front());
+        this->tasks.pop();
       }
-      if (found) {
-        task();
-      } else {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      }
+      task();
     }
   }
 
 public:
   explicit ThreadPool(const size_t numThreads) : stop(false) {
+    workers.reserve(numThreads);
     for (size_t i = 0; i < numThreads; ++i) {
-      // spune explicit ca va executa doar workerLoop si ii dam obiectul pentru
-      // a avea acces la tasks
       workers.emplace_back(&ThreadPool::WorkerLoop, this);
     }
   }
 
-  void Enqueue(const std::function<void()> &task) {
-    std::lock_guard lock(queue_mutex);
-    if (!stop) {
-      tasks.push(task);
+  void Enqueue(std::function<void()> task) {
+    {
+      std::lock_guard lock(queue_mutex);
+      if (!stop)
+        tasks.push(std::move(task));
     }
+    cv.notify_one();
   }
 
   ~ThreadPool() {
@@ -59,7 +53,7 @@ public:
       std::lock_guard lock(queue_mutex);
       stop = true;
     }
-    // un wait pentru threaduri, asteptam ca munca sa se opreasca
+    cv.notify_all();
     for (std::thread &worker : workers) {
       if (worker.joinable())
         worker.join();

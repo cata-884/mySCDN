@@ -3,9 +3,13 @@
 #include <cstring>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
-inline void throwIF(const bool condition, const std::string &msg) {
+inline void throwIF(const bool condition, std::string_view msg) {
   if (condition) {
-    throw std::runtime_error(msg + ": " + std::strerror(errno));
+    std::string full(msg);
+    full += ": ";
+    full += std::strerror(errno);
+    throw std::runtime_error(full);
   }
 }

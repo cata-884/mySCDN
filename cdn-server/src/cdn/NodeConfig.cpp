@@ -37,22 +37,10 @@ const PeerDescriptor *NodeConfig::findNode(const std::string &id) const {
 const PeerDescriptor &NodeConfig::self() const {
   const PeerDescriptor *ptr = findNode(nodeId);
   throwIF(!ptr, "Nodul curent (" + nodeId +
-                 ") nu a fost gasit in lista de cluster-nodes!");
+                    ") nu a fost gasit in lista de cluster-nodes!");
   return *ptr;
 }
-/*
-init cluster 2 noduri
-./myscdn_node \
-    --node-id node1 \
-    --listen 10.100.0.30:8000 \
-    --cluster-node node2@10.100.0.30:8001 \
-    --target-files ../targetFiles \
-    --max-connections 10 \
-    --cache-bytes 104857600 \
-    --ttl 3600 \
-    --db-path ../CDN.db \
-    --auth-file ../auth.txt
-*/
+
 NodeConfig ParseArguments(const int argc, char *argv[]) {
   NodeConfig config;
   bool idSet = false;
@@ -64,29 +52,29 @@ NodeConfig ParseArguments(const int argc, char *argv[]) {
   bool dbSet = false;
 
   for (int i = 1; i < argc; ++i) {
-    // numele noului nod declarat
+
     if (std::string arg = argv[i]; arg == "--node-id" && i + 1 < argc) {
       config.nodeId = argv[++i];
       idSet = true;
     }
-    // detalii pentru a rula serverul si a asculta comenzi
+
     else if (arg == "--listen" && i + 1 < argc) {
       const auto [fst, snd] = processIP_Port(argv[++i]);
       config.ipAddress = fst;
       config.port = snd;
       listenSet = true;
     }
-    // detaliile subnodurilor colege
+
     else if (arg == "--cluster-node" && i + 1 < argc) {
       config.peersVector.push_back(processPeer(argv[++i]));
-      // clusterSet = true;
+
     }
-    // de unde preluam datele
+
     else if (arg == "--target-files" && i + 1 < argc) {
       config.targetFilesLocation = argv[++i];
       targetSet = true;
     }
-    // in rest e self-explanatory
+
     else if (arg == "--max-connections" && i + 1 < argc) {
       config.maxConexiuni = std::stoul(argv[++i]);
       maxConnSet = true;
@@ -119,9 +107,6 @@ NodeConfig ParseArguments(const int argc, char *argv[]) {
 
   throwIF(!dbSet, "Argument lipsa: --db-path este obligatoriu");
 
-  // ne asiguram ca nodul specificat in cl face parte din peersVector. nu putem
-  // sa avem Node1 <-> Node2 cand doar Node2 face parte din
-  // vector<PeerDescriptor>
   bool selfFound = false;
   for (const auto &p : config.peersVector) {
     if (p.ID == config.nodeId) {
@@ -131,7 +116,8 @@ NodeConfig ParseArguments(const int argc, char *argv[]) {
   }
 
   if (!selfFound) {
-    config.peersVector.emplace_back(config.nodeId, config.ipAddress, config.port);
+    config.peersVector.emplace_back(config.nodeId, config.ipAddress,
+                                    config.port);
   }
 
   return config;
